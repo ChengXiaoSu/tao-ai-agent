@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  *  ollama 接入本地部署大模型
  */
 // 取消注释即可在 SpringBoot 项目启动时执行
-@Component
+//@Component
 public class OllamaAiInvoke implements CommandLineRunner {
 
     @Resource

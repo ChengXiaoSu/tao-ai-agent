@@ -1,14 +1,20 @@
 package com.zt.taoaiagent.demo.invoke;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 /**
  * @author javatao
  * @date 2026/10/27 17:38
  */
-public interface TestApiKey {
+@Component
+public class TestApiKey {
 
     //阿里云百炼平台 apikey
-//    @Value("${your-app.api.key}")
-    String API_KEY = "Your Api Key";
+    @Value("${tao-ai.api-key}")
+    private String apiKey;
+
+    public String getApiKey() {
+        return apiKey;
+    }
 }

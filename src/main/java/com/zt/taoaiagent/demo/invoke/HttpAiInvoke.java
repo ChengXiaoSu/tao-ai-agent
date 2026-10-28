@@ -5,6 +5,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import com.zt.taoaiagent.TaoAiAgentApplication;
+import org.springframework.boot.Banner;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 
 /**
  *  测试HTTP方式接入大模型
@@ -12,6 +17,12 @@ import java.time.Duration;
 public class HttpAiInvoke {
 
     public static void main(String[] args) throws Exception {
+        try (ConfigurableApplicationContext ctx = new SpringApplicationBuilder(TaoAiAgentApplication.class)
+                .web(WebApplicationType.NONE)
+                .bannerMode(Banner.Mode.OFF)
+                .logStartupInfo(false)
+                .run(args)) {
+            TestApiKey testApiKey = ctx.getBean(TestApiKey.class);
         // 1. 从环境变量读取 API Key，避免硬编码
 //        String apiKey = System.getenv("DASHSCOPE_API_KEY");
 //        if (apiKey == null || apiKey.isBlank()) {
@@ -53,7 +64,7 @@ public class HttpAiInvoke {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(60))
-                .header("Authorization", "Bearer " + TestApiKey.API_KEY)
+                .header("Authorization", "Bearer " + testApiKey.getApiKey())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
@@ -67,5 +78,6 @@ public class HttpAiInvoke {
         System.out.println("HTTP 状态码: " + response.statusCode());
         System.out.println("响应体:");
         System.out.println(response.body());
+        }
     }
 }
