@@ -8,7 +8,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 /**
- *  ollama 接入本地部署大模型
+ * ollama 接入本地部署大模型
+ * 需要修改pom文件以及application-local.yml文件
  */
 // 取消注释即可在 SpringBoot 项目启动时执行
 //@Component

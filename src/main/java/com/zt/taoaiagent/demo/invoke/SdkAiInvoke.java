@@ -2,6 +2,7 @@ package com.zt.taoaiagent.demo.invoke;
 
 import java.util.Arrays;
 import java.util.Collections;
+
 import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversation;
 import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversationParam;
 import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversationResult;
@@ -22,8 +23,10 @@ import org.springframework.context.ConfigurableApplicationContext;
  * 测试SDK方式接入大模型
  */
 public class SdkAiInvoke {
-    
-    static {Constants.baseHttpApiUrl="https://ws-3sj0n01mpib5bvt2.cn-beijing.maas.aliyuncs.com/api/v1";}
+
+    static {
+        Constants.baseHttpApiUrl = "https://ws-3sj0n01mpib5bvt2.cn-beijing.maas.aliyuncs.com/api/v1";
+    }
 
     public static void simpleMultiModalConversationCall(TestApiKey testApiKey)
             throws ApiException, NoApiKeyException, UploadFileException {
@@ -40,6 +43,7 @@ public class SdkAiInvoke {
         MultiModalConversationResult result = conv.call(param);
         System.out.println(result.getOutput().getChoices().get(0).getMessage().getContent().get(0).get("text"));
     }
+
     public static void main(String[] args) {
         try (ConfigurableApplicationContext ctx = new SpringApplicationBuilder(TaoAiAgentApplication.class)
                 .web(WebApplicationType.NONE)

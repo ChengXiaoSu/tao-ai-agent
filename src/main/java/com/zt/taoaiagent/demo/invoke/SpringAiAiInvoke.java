@@ -7,7 +7,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 /**
- *  测试Spring AI接入大模型
+ * 测试Spring AI接入大模型
  */
 // 取消注释即可在 SpringBoot 项目启动时执行
 //@Component
