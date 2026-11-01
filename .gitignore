@@ -1,6 +1,7 @@
 **/application-local.yml
 HELP.md
 target/
+chat_memory/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -19,6 +20,7 @@ target/
 *.iws
 *.iml
 *.ipr
+
 
 ### NetBeans ###
 /nbproject/private/

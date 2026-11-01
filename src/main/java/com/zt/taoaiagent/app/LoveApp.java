@@ -2,11 +2,9 @@ package com.zt.taoaiagent.app;
 
 
 import com.zt.taoaiagent.advisor.MyLoggerAdvisor;
-import com.zt.taoaiagent.advisor.ReReadAdvisor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -48,6 +46,16 @@ public class LoveApp {
                 .chatMemoryRepository(new InMemoryChatMemoryRepository())
                 .maxMessages(10)
                 .build();
+
+        /**
+         *  初始化基于文件的对话记忆
+         *  userDir：对话记忆文件存储目录
+         *  maxMessages：对话记忆最大消息数
+         *  自定义文件持久化测试
+         */
+//        String userDir = System.getProperty("user.dir") + "/chat_memory";
+//        ChatMemory chatMemory = new FileBasedChatMemory(userDir, 10);
+
 
         // 2. 使用 Builder 模式创建 MessageChatMemoryAdvisor
         MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory)
