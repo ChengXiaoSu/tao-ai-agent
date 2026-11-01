@@ -1,9 +1,12 @@
 package com.zt.taoaiagent.app;
 
 
+import com.zt.taoaiagent.advisor.MyLoggerAdvisor;
+import com.zt.taoaiagent.advisor.ReReadAdvisor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -35,10 +38,24 @@ public class LoveApp {
         MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory)
                 .build();
 
-        // 3.创建 ChatClient 实例
+        /**
+         * 3. 创建 ChatClient 实例
+         * defaultAdvisors(...) 中配置了两个 Advisor：
+         * 1) memoryAdvisor：用于多轮对话记忆，按 chatId 读写历史消息；
+         * 2) SimpleLoggerAdvisor：用于记录请求/响应日志，便于调试。
+         * 注意：两者都不是必须的。去掉 memoryAdvisor 仍可正常对话，但会失去多轮记忆；
+         * 去掉 SimpleLoggerAdvisor 也可运行，只是不会自动打印 Advisor 日志。按需保留即可。
+         *
+         * 3)自定义日志Advisor  MyLoggerAdvisor
+         */
         chatClient = ChatClient.builder(deepSeekChatModel)
                 .defaultSystem(SYSTEM_PROMPT)
-                .defaultAdvisors(memoryAdvisor)
+                .defaultAdvisors(
+                        memoryAdvisor,
+                        new MyLoggerAdvisor()
+                        //自定义推理增强advisor 可按需开启
+                        //new ReReadAdvisor()
+                )
                 .build();
     }
 
