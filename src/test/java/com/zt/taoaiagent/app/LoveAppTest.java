@@ -1,5 +1,4 @@
 package com.zt.taoaiagent.app;
-
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -7,7 +6,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
 
 
 @SpringBootTest
@@ -31,12 +29,12 @@ class LoveAppTest {
         Assertions.assertNotNull(message, answer);
 
         //第三轮对话
-        message = "你是情感方面的专家吗";
+        message = "我想让我的另一半（上官浅）更爱我";
         answer = loveApp.doChat(message, chatId);
         Assertions.assertNotNull(message, answer);
 
         //第四轮对话
-        message = "我想让我的另一半（上官浅）更爱我";
+        message = "你是情感方面的专家吗";
         answer = loveApp.doChat(message, chatId);
         Assertions.assertNotNull(message, answer);
 
@@ -54,4 +52,28 @@ class LoveAppTest {
         LoveApp.LoveReport loveReport = loveApp.doChatWithReport(message, chatId);
         Assertions.assertNotNull(loveReport);
     }
+
+    @Test
+    void testFileBasedChat1() {
+        // 注意：chatId 必须固定，不能用 UUID，否则重启后对不上
+        String chatId = "persist-test-001";
+
+        //第一轮对话：写入记忆后进程结束
+        String message = "我叫程序员涛，请记住这个名字";
+        String answer = loveApp.doChat(message, chatId);
+        System.out.println("第一轮回答: " + answer);
+    }
+
+    @Test
+    void testFileBasedChat2() {
+        // 与第一次运行使用同一个 chatId
+        String chatId = "persist-test-001";
+
+        // 只问上一轮说过的事，看模型能否从文件记忆里答出来
+        String message = "我刚才说我叫什么名字？";
+        String answer = loveApp.doChat(message, chatId);
+        System.out.println("第二轮回答: " + answer);
+    }
+
+
 }

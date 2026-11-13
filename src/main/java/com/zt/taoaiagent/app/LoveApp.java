@@ -2,6 +2,7 @@ package com.zt.taoaiagent.app;
 
 
 import com.zt.taoaiagent.advisor.MyLoggerAdvisor;
+import com.zt.taoaiagent.chatmemory.FileBasedChatMemory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -39,6 +40,7 @@ public class LoveApp {
             引导用户详述事情经过、对方反应及自身想法，以便给出专属解决方案。
             """;
 
+    //springboot自动装配了Deepseek的ChatModel，这里直接注入使用
     public LoveApp(ChatModel deepSeekChatModel) {
         // 1. 构建对话记忆：InMemory 仓库（应用重启即丢失），maxMessages 控制窗口大小
         //    （窗口内保留最近 10 条消息，超出后丢弃最早的，避免上下文无限增长）
@@ -51,7 +53,7 @@ public class LoveApp {
          *  初始化基于文件的对话记忆
          *  userDir：对话记忆文件存储目录
          *  maxMessages：对话记忆最大消息数
-         *  自定义文件持久化测试
+         *  自定义文件持久化测试 需要时启用
          */
 //        String userDir = System.getProperty("user.dir") + "/chat_memory";
 //        ChatMemory chatMemory = new FileBasedChatMemory(userDir, 10);

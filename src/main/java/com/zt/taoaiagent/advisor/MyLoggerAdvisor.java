@@ -41,7 +41,7 @@ public class MyLoggerAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private void logResponse(ChatClientResponse chatClientResponse) {
-        log.info("Ai Response: {}", chatClientResponse.chatResponse().getResult().getOutput().getText());
+        log.info("AI 响应内容: {}", chatClientResponse.chatResponse().getResult().getOutput().getText());
     }
 
     @Override
