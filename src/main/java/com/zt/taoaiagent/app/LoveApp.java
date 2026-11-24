@@ -3,7 +3,6 @@ package com.zt.taoaiagent.app;
 
 import com.zt.taoaiagent.advisor.MyLoggerAdvisor;
 import com.zt.taoaiagent.chatmemory.FileBasedChatMemory;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -15,8 +14,11 @@ import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -31,14 +33,11 @@ import java.util.List;
 @Slf4j
 public class LoveApp {
 
-    @Resource
-    private VectorStore loveAppVectorStore;
-
-    @Resource
-    private Advisor loveAppRagCloudAdvisor;
-
-
     private final ChatClient chatClient;
+
+    private final VectorStore loveAppVectorStore;
+
+    private final Advisor loveAppRagCloudAdvisor;
 
     /**
      * 系统提示词：设定模型角色为恋爱心理专家，并按单身/恋爱/已婚三种状态
@@ -51,24 +50,25 @@ public class LoveApp {
             引导用户详述事情经过、对方反应及自身想法，以便给出专属解决方案。
             """;
 
-    //springboot自动装配了Deepseek的ChatModel，这里直接注入使用
-    public LoveApp(ChatModel deepSeekChatModel) {
-        // 1. 构建对话记忆：InMemory 仓库（应用重启即丢失），maxMessages 控制窗口大小
-        //    （窗口内保留最近 10 条消息，超出后丢弃最早的，避免上下文无限增长）
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new InMemoryChatMemoryRepository())
-                .maxMessages(10)
-                .build();
+    /**
+     * 显式指定依赖：
+     * 1) 容器中同时存在 DeepSeek / Ollama / DashScope 三个 ChatModel 以及
+     *    Ollama / DashScope 两个 EmbeddingModel，必须用 @Qualifier 按 Bean 名注入，
+     *    不能依赖“构造器参数名 == Bean 名”的隐式兜底规则；
+     * 2) loveAppVectorStore 为本地 RAG 向量库（Ollama bge-m3 向量化）；
+     * 3) loveAppRagCloudAdvisor 为百炼云端知识库检索 Advisor。
+     * 对话记忆类型由 tao-ai.chat.memory.type 控制：in-memory（默认）或 file。
+     */
+    public LoveApp(@Qualifier("deepSeekChatModel") ChatModel deepSeekChatModel,
+                   @Qualifier("loveAppVectorStore") VectorStore loveAppVectorStore,
+                   @Qualifier("loveAppRagCloudAdvisor") Advisor loveAppRagCloudAdvisor,
+                   @Value("${tao-ai.chat.memory.type:in-memory}") String memoryType,
+                   @Value("${tao-ai.chat.memory.max-messages:10}") int maxMessages) {
+        this.loveAppVectorStore = loveAppVectorStore;
+        this.loveAppRagCloudAdvisor = loveAppRagCloudAdvisor;
 
-        /**
-         *  初始化基于文件的对话记忆
-         *  userDir：对话记忆文件存储目录
-         *  maxMessages：对话记忆最大消息数
-         *  自定义文件持久化测试 需要时启用
-         */
-//        String userDir = System.getProperty("user.dir") + "/chat_memory";
-//        ChatMemory chatMemory = new FileBasedChatMemory(userDir, 10);
-
+        // 1. 构建对话记忆：窗口内保留最近 maxMessages 条消息，超出后丢弃最早的，避免上下文无限增长
+        ChatMemory chatMemory = createChatMemory(memoryType, maxMessages);
 
         // 2. 使用 Builder 模式创建 MessageChatMemoryAdvisor
         MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory)
@@ -94,6 +94,24 @@ public class LoveApp {
     }
 
     /**
+     * 按配置创建对话记忆：
+     * - in-memory（默认）：应用重启即丢失，适合开发调试；
+     * - file：Kryo 文件持久化，重启后仍可恢复历史。
+     */
+    private static ChatMemory createChatMemory(String memoryType, int maxMessages) {
+        if ("file".equalsIgnoreCase(memoryType)) {
+            String userDir = System.getProperty("user.dir") + File.separator + "chat_memory";
+            log.info("对话记忆：文件持久化（目录 {}，窗口 {} 条）", userDir, maxMessages);
+            return new FileBasedChatMemory(userDir, maxMessages);
+        }
+        log.info("对话记忆：内存（窗口 {} 条，重启即丢失）", maxMessages);
+        return MessageWindowChatMemory.builder()
+                .chatMemoryRepository(new InMemoryChatMemoryRepository())
+                .maxMessages(maxMessages)
+                .build();
+    }
+
+    /**
      * 与恋爱专家模型对话（带多轮记忆）。
      *
      * @param message 用户本次输入的对话内容
@@ -109,7 +127,19 @@ public class LoveApp {
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
                 .call()
                 .chatResponse();
-        // 提取模型返回的第一条结果文本
+        // 提取模型返回的第一条结果文本（空响应时返回空串并告警，避免 NPE）
+        return extractContent(response);
+    }
+
+    /**
+     * 安全提取模型输出文本：DeepSeek 返回空 choices、内容被过滤或流式异常时，
+     * chatResponse/result/output 均可能为 null。
+     */
+    private static String extractContent(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.warn("模型未返回有效响应（chatResponse/result/output 为空）");
+            return "";
+        }
         String content = response.getResult().getOutput().getText();
         log.info("content: {}", content);
         return content;
@@ -122,7 +152,7 @@ public class LoveApp {
      * @param title       报告标题
      * @param suggestions 建议列表
      */
-    record LoveReport(String title, List<String> suggestions) {
+    public record LoveReport(String title, List<String> suggestions) {
     }
 
 
@@ -139,8 +169,9 @@ public class LoveApp {
         LoveReport loveReport = chatClient
                 .prompt()
                 // 本次请求覆盖默认系统提示词：在原人设基础上追加结构化输出要求
-                // 注意：{用户名} 是模板占位符语法，会由 Spring AI 渲染，需配合 .params(...) 传入变量
-                .system(SYSTEM_PROMPT + "每次对话都要生成恋爱结果，标题为{用户名}的恋爱报告，内容为建议列表")
+                // 注意：system 文本会经 PromptTemplate 渲染，花括号会被当成变量占位符并做变量校验，
+                // 未通过 .params(...) 提供同名变量时会抛 IllegalArgumentException，因此这里不使用 {} 语法
+                .system(SYSTEM_PROMPT + "每次对话都要生成恋爱结果：标题需包含用户在对话中提到的姓名（未提及时用“你的”），内容为建议列表")
                 .user(message)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
                 .call()
@@ -153,35 +184,44 @@ public class LoveApp {
 
 
     public String doChatWithRag(String message, String chatId) {
-        ChatResponse chatResponse = chatClient
-                .prompt()
-                .user(message)
-                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
-                // 开启日志，便于观察效果
-                .advisors(new MyLoggerAdvisor())
-                // 应用知识库问答
-                .advisors(new QuestionAnswerAdvisor(loveAppVectorStore))
-                .call()
-                .chatResponse();
-        String content = chatResponse.getResult().getOutput().getText();
-        log.info("content: {}", content);
-        return content;
+        try {
+            ChatResponse chatResponse = chatClient
+                    .prompt()
+                    .user(message)
+                    .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                    // 开启日志，便于观察效果
+                    .advisors(new MyLoggerAdvisor())
+                    // 应用知识库问答
+                    .advisors(new QuestionAnswerAdvisor(loveAppVectorStore))
+                    .call()
+                    .chatResponse();
+            return extractContent(chatResponse);
+        } catch (Exception e) {
+            // 本地向量库依赖 Ollama 与 bge-m3，运行时不可用（未启动/未拉取模型）时
+            // 降级为普通对话，避免整个请求失败
+            log.warn("本地 RAG 检索失败，降级为普通对话：{}", e.getMessage());
+            return doChat(message, chatId);
+        }
     }
 
     public String doChatWithCloudRag(String message, String chatId) {
-        ChatResponse chatResponse = chatClient
-                .prompt()
-                .user(message)
-                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
-                // 开启日志，便于观察效果
-                .advisors(new MyLoggerAdvisor())
-                // 应用增强索引服务，去云知识库
-                .advisors(loveAppRagCloudAdvisor)
-                .call()
-                .chatResponse();
-        String content = chatResponse.getResult().getOutput().getText();
-        log.info("content: {}", content);
-        return content;
+        try {
+            ChatResponse chatResponse = chatClient
+                    .prompt()
+                    .user(message)
+                    .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                    // 开启日志，便于观察效果
+                    .advisors(new MyLoggerAdvisor())
+                    // 应用增强索引服务，去云知识库
+                    .advisors(loveAppRagCloudAdvisor)
+                    .call()
+                    .chatResponse();
+            return extractContent(chatResponse);
+        } catch (Exception e) {
+            // 百炼知识库不可用（索引不存在/鉴权失败/网络异常）时降级为普通对话
+            log.warn("云端 RAG 检索失败，降级为普通对话：{}", e.getMessage());
+            return doChat(message, chatId);
+        }
     }
 
 

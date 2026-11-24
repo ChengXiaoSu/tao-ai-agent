@@ -41,6 +41,12 @@ public class MyLoggerAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private void logResponse(ChatClientResponse chatClientResponse) {
+        // 模型返回空 choices、内容被过滤或流式异常时，chatResponse/result 可能为 null
+        if (chatClientResponse == null || chatClientResponse.chatResponse() == null
+                || chatClientResponse.chatResponse().getResult() == null) {
+            log.warn("AI 响应为空（chatResponse 或 result 为 null）");
+            return;
+        }
         log.info("AI 响应内容: {}", chatClientResponse.chatResponse().getResult().getOutput().getText());
     }
 

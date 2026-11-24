@@ -25,7 +25,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * 基于文件持久化的对话记忆（Kryo 序列化 + 原子替换写）。
  * <p>
  * 关键设计：
- * 1) 所有读写操作加锁串行化，避免并发丢消息，同时保证共享 static Kryo 的线程安全；
+ * 1) 每个实例持有独立的 Kryo 并由实例锁串行化读写，多实例并发互不干扰；
  * 2) 先写临时文件再原子替换，进程中断不会留下损坏文件；
  * 3) 读取失败（文件损坏）时删除文件并返回空列表，不让异常打穿对话链路；
  * 4) chatId 经 Base64 编码后作为文件名，防止路径穿越。
@@ -38,15 +38,11 @@ public class FileBasedChatMemory implements ChatMemory {
     private final String baseDir;
     private final int maxMessages;
 
-    private static final Kryo kryo = new Kryo();
+    // Kryo 非线程安全，改为实例级：每个 FileBasedChatMemory 持有独立 Kryo，由实例锁保护。
+    // 避免“静态共享 Kryo + 实例锁”在创建多个记忆实例（不同目录）时出现并发损坏。
+    private final Kryo kryo;
 
-    static {
-        kryo.setRegistrationRequired(false);
-        // 设置实例化策略：绕过构造器创建对象，保证反序列化 Spring AI 消息成功
-        kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
-    }
-
-    // 全局锁串行化读写：add 是"读-改-写"三步，必须原子化，否则并发丢消息
+    // 实例锁串行化读写：add 是"读-改-写"三步，必须原子化，否则并发丢消息
     private final ReentrantLock lock = new ReentrantLock();
 
     // 构造对象时，指定文件保存目录（默认最多保留 20 条消息）
@@ -57,9 +53,13 @@ public class FileBasedChatMemory implements ChatMemory {
     public FileBasedChatMemory(String dir, int maxMessages) {
         this.baseDir = dir;
         this.maxMessages = maxMessages;
+        this.kryo = new Kryo();
+        this.kryo.setRegistrationRequired(false);
+        // 设置实例化策略：绕过构造器创建对象，保证反序列化 Spring AI 消息成功
+        this.kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
         File base = new File(dir);
-        if (!base.exists()) {
-            base.mkdirs();
+        if (!base.exists() && !base.mkdirs()) {
+            log.warn("对话记忆目录创建失败，持久化可能不可用: {}", dir);
         }
     }
 

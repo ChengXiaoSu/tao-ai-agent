@@ -2,7 +2,15 @@ spring:
   application:
     name: tao-ai-agent
   profiles:
-    active: local
+    # 默认 local，部署时可用环境变量 SPRING_PROFILES_ACTIVE 覆盖
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  ai:
+    # 显式声明使用哪个 ChatModel / EmbeddingModel，避免多个同类型 Bean 造成注入歧义：
+    # chat: deepseek   -> 只装配 DeepSeekChatModel（关闭 Ollama/DashScope 的 ChatModel 自动装配）
+    # embedding: ollama -> 只装配 OllamaEmbeddingModel（本地 bge-m3）
+    model:
+      chat: deepseek
+      embedding: ollama
 server:
   port: 8123
   servlet:
