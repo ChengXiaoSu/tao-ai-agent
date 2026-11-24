@@ -18,7 +18,7 @@ public class SpringAiAiInvoke implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        String response = deepSeekChatModel.call(new Prompt("你好，我是程序员涛"))
+        String response = deepSeekChatModel.call(new Prompt("你好，你是？"))
                 .getResult()
                 .getOutput()
                 .getText();
